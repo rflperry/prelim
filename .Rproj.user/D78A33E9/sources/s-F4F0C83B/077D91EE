@@ -1,0 +1,24 @@
+{
+    "id": "077D91EE",
+    "path": "~/Documents/UW/prelim_work/figure_replication/scripts/make_plots.R",
+    "project_path": "scripts/make_plots.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1682958722737.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "cursorPosition": "9,30",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1681312630,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1681312630,
+    "read_only": false,
+    "read_only_alternatives": []
+}

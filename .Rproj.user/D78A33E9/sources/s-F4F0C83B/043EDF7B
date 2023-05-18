@@ -1,0 +1,24 @@
+{
+    "id": "043EDF7B",
+    "path": "~/Dropbox/Rank Selection for PCA/code/scripts/plot_paper_figures.R",
+    "project_path": null,
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1684370710816.0,
+    "source_on_save": false,
+    "relative_order": 9,
+    "properties": {
+        "cursorPosition": "426,2",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1684367115,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1684367115,
+    "read_only": false,
+    "read_only_alternatives": []
+}

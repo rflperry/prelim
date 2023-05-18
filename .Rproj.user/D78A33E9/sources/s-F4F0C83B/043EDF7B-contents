@@ -1,0 +1,689 @@
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(viridis) 
+library(stringr)
+library(scales)
+
+theme_update(text = element_text(size=10, family="Times"))
+color_map <- c("Choi" = hue_pal()(3)[1], "Choi (Bf.)" = hue_pal()(3)[2], "SI" = hue_pal()(3)[3])
+scale_map <- c("Choi" = 16, "Choi (Bf.)" = 17, "SI" = 15)
+
+#
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 	Toy Example
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#
+
+load("./data/paper/elbow-power_vs_null_strength_multi_test.RData")
+results_df <- results_df %>% mutate(
+  method = case_when(
+    method == "Selective inference" ~ "Selective Inference",
+    method == "Selective inference (exact)" ~ "SI (exact)",
+    # method == "Choi (Bonferroni)" ~ "Choi_Bonferroni",
+    method == "Choi" ~ "Choi et al. (2017)",
+  )
+)
+
+####### QQ-plot (subset)
+
+g <- ggplot(
+  data=results_df %>%
+    # subset(method != 'SI (exact)'), # %>%
+    # subset(tested_k == selection_r),
+    subset(tested_k <= selection_r),
+  aes(sample=pvalue, col=method))+
+  geom_qq(
+    distribution="qunif"
+  ) +
+  geom_abline(col="black", lty = 2) +
+  xlab('Uniform distribution quantiles') +
+  ylab('Empirical quantiles') +
+  labs(color='Method') +
+  theme_bw()
+  # theme(legend.position="bottom", text=element_text(size=10))
+print(g)
+ggsave(paste0('./figures_paper/elbow_global_null_validity.png'), width = 3.7, height = 2, unit = "in")
+
+######## QQ/ECDF plot (non-stratified)
+linetype_map <- c( "Selective Inference" = "solid", "Choi et al. (2017)" = "dashed")
+g <- ggplot(
+  data=results_df %>%
+    subset(method != 'SI (exact)'),
+  # aes(x=pvalue, linetype=method, col=tested_k+2, group=interaction(method, tested_k))) +
+  aes(x=1 - pvalue, linetype=method)) +
+  stat_ecdf()+
+  geom_abline(col="grey", lty = 3) +
+  ylab('Empirical quantiles') +
+  xlab('Uniform distribution quantiles') +
+  labs(linetype='Method') +
+  # scale_color_viridis(option = "D")+
+  # scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_linetype_manual(values = linetype_map) +
+  theme_bw()# legend.position="bottom", legend.box="vertical", 
+print(g)
+ggsave(paste0('./figures_paper/elbow_global_null_validity_lines.png'), width = 3.7, height = 2, unit = "in")
+
+######## QQ/ECDF plot (all)
+linetype_map <- c( "Selective Inference" = "solid", "Choi et al. (2017)" = "dashed")
+g <- ggplot(
+  data=results_df %>%
+    subset(method != 'SI (exact)'),
+  # aes(x=pvalue, linetype=method, col=tested_k+2, group=interaction(method, tested_k))) +
+  aes(x=1 - pvalue, linetype=method, col=as.factor(tested_k))) +
+  stat_ecdf()+
+  geom_abline(col="black", lty = 3) +
+  ylab('Empirical quantiles') +
+  xlab('Uniform distribution quantiles') +
+  labs(linetype='Method', col='Tested') +
+  # scale_color_viridis(option = "D")+
+  # scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_color_brewer(palette="Blues", type="seq", limits=as.factor(seq(0, 8)), breaks=seq(1, 8)) +
+  scale_linetype_manual(values = linetype_map) +
+  theme_bw() +# legend.position="bottom", legend.box="vertical", 
+  theme(legend.box="horizontal", text=element_text(size=10)) +
+  guides(color=guide_legend(ncol=2))
+print(g)
+ggsave(paste0('./figures_paper/elbow_global_null_validity_ecdf.png'), width = 5, height = 2, unit = "in")
+
+######## T1 error
+g <- ggplot(
+  rbind(results_df, results_df %>%
+          subset(method == 'Choi') %>%
+          mutate(method = 'Choi (Bf.)')) %>%
+    subset(method != 'SI (exact)') %>%
+    mutate(rejected = as.integer(pvalue <= ifelse( method == 'Choi (Bf.)', alpha / (p-2), alpha ))) %>%
+    group_by(method, tested_k) %>%
+    summarize(power = mean(rejected), se = sqrt(power * (1 - power) / n())),
+  aes(x=tested_k, y=power, shape=method, col=method)) +
+  geom_line(size=0.5) + #, linetype = 'dashed')+
+  geom_point(size=2) +
+  geom_errorbar(aes(ymin=power-1.96*se, ymax=power+1.96*se), width=.1) +
+  xlab('Tested index') +
+  ylab('T1 Error') +
+  labs(col='Method', shape='Method') +
+  # scale_color_brewer(palette="Reds") +
+  # scale_color_brewer(palette="RdYlBu") +
+  # scale_color_viridis(discrete = TRUE, option = "D") +
+  # scale_fill_viridis(discrete = TRUE) +
+  geom_hline(yintercept=0.05, linetype="dashed",color = "gray", size=0.5) +
+  # scale_x_log10() +
+  # scale_colour_manual(values=color_map) +
+  theme_bw()
+plot(g)
+ggsave(paste0('./figures_paper/elbow_global_null_validity_t1.png'), width = 5, height = 1.5, unit = "in")
+
+####### scree plot
+
+# Null: vals <- c(79, 70, 63, 57, 45, 38, 36, 25, 23, 19)
+# note r here = 7
+
+# Signal (sigma=0.3):
+# r = 5 here
+vals <- c(28, 23, 20, 15, 9.6, 6.3, 5.5, 3.5, 2.9, 2.1)
+vals[6:10] <- vals[6:10] / 1.5
+g <- ggplot(
+  data=data.frame(Index=seq(1,10), Eigenvalue=vals),
+  aes(x=Index, y=Eigenvalue)) +
+  geom_point() +
+  theme(text=element_text(size=10)) +
+  scale_x_continuous(breaks= pretty_breaks()) +
+  theme_bw()
+print(g)
+ggsave(paste0('./figures_paper/scree_plot.pdf'), width = 2, height = 2, unit = "in")
+
+#
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 	Selection figures
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#
+
+# vals <- c(117.99380, 101.90700,  82.89410,  71.13021,  55.87137 , 48.77031 , 37.70187 , 31.25143 , 22.81524,  19.20360)
+vals <- c(114.32788 , 95.63982,  85.51193 , 66.00243  ,61.09360  ,54.05573  ,47.87799 , 31.80371 , 31.01390,  19.73305)
+
+# Case 1
+k <- 2
+bounds <- c(92.27767, Inf)
+
+g <- ggplot(
+  data=data.frame(Index=seq(1,10), Eigenvalue=vals),
+  aes(x=Index, y=Eigenvalue)) +
+  geom_point() +
+  theme(text=element_text(size=10)) +
+  scale_x_continuous(breaks= pretty_breaks()) +
+  geom_segment(aes(x = k, y = bounds[1], xend = k, yend = vals[k-1]+10), color='Red', arrow = arrow(length = unit(0.2, "cm"))) +
+  geom_segment(aes(x = k-0.3, y = bounds[1], xend = k+0.3, yend = bounds[1]), color='Red') +
+  theme_bw()
+print(g)
+ggsave(paste0('./figures_paper/scree_plot_elbow_case1.png'), width = 2, height = 2, unit = "in")
+
+# Case 3
+# k <- 3
+# bounds <- c(73.17889, Inf)
+
+k <- 4
+bounds <- c(65.66053, Inf)
+
+g <- ggplot(
+  data=data.frame(Index=seq(1,10), Eigenvalue=vals),
+  aes(x=Index, y=Eigenvalue)) +
+  geom_point() +
+  theme(text=element_text(size=10)) +
+  scale_x_continuous(breaks= pretty_breaks()) +
+  geom_segment(aes(x = k, y = bounds[1], xend = k, yend = vals[k-1]+10), color='Red', arrow = arrow(length = unit(0.2, "cm"))) +
+  geom_segment(aes(x = k-0.3, y = bounds[1], xend = k+0.3, yend = bounds[1]), color='Red') +
+  theme_bw()
+print(g)
+ggsave(paste0('./figures_paper/scree_plot_elbow_case3.png'), width = 2, height = 2, unit = "in")
+
+# Case 2
+k <- 5
+bounds <- c(52.38685, 61.7774 )
+
+g <- ggplot(
+  data=data.frame(Index=seq(1,10), Eigenvalue=vals),
+  aes(x=Index, y=Eigenvalue)) +
+  theme(text=element_text(size=10)) +
+  scale_x_continuous(breaks= pretty_breaks()) +
+  annotate('rect', xmin=-Inf, xmax=Inf, ymin=vals[k-1], ymax=Inf, alpha=.2, fill='yellow') +
+  annotate('rect', xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=vals[k+1], alpha=.2, fill='yellow') +
+  geom_segment(aes(x = k, y = bounds[1], xend = k, yend = bounds[2]), color='Red') +
+  geom_segment(aes(x = k-0.3, y = bounds[1], xend = k+0.3, yend = bounds[1]), color='Red') +
+  geom_segment(aes(x = k-0.3, y = bounds[2], xend = k+0.3, yend = bounds[2]), color='Red') +
+  geom_point() +
+  theme_bw()
+print(g)
+ggsave(paste0('./figures_paper/scree_plot_elbow_case2.png'), width = 2, height = 2, unit = "in")
+
+
+#
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 	3 panes
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#
+
+vals <- c(114.32788 , 95.63982,  85.51193 , 66.00243  ,61.09360  ,54.05573  ,47.87799 , 31.80371 , 31.01390,  19.73305)
+r1 <- select_r_elbow(vals)[1] + 1
+  
+# Case 2
+k <- 5
+bounds <- c(52.38685, 61.7774)
+
+t2 <- bounds[2] + 10
+temp_vals2 <- vals
+temp_vals2[k] <- t2
+r2 <- select_r_elbow(temp_vals2)[1] + 1
+
+t3 <- bounds[1] - 10
+temp_vals3<- vals
+temp_vals3[k] <- t3
+r3 <- select_r_elbow(temp_vals3)[1] + 1
+
+# regular
+g <- ggplot(
+  data=data.frame(Index=seq(1,10)[-k], Eigenvalue=vals[-k]),
+  aes(x=Index, y=Eigenvalue)) +
+  theme(text=element_text(size=10)) +
+  scale_x_continuous(breaks= pretty_breaks()) +
+  annotate('rect', xmin=-Inf, xmax=Inf, ymin=vals[k-1], ymax=Inf, alpha=.2, fill='yellow') +
+  annotate('rect', xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=vals[k+1], alpha=.2, fill='yellow') +
+  geom_point() +
+  geom_point(aes(x = k, y = vals[k]), color='green', size=2) +
+  geom_segment(aes(x = r1, y = vals[r1], xend = r1-1, yend = vals[r1-1]), color='green', linetype='dashed') +
+  geom_segment(aes(x = r1, y = vals[r1], xend = r1+1, yend = vals[r1+1]), color='green', linetype='dashed') +
+  geom_segment(aes(x = k, y = bounds[1], xend = k, yend = bounds[2]), color='black', alpha=1) +
+  geom_segment(aes(x = k-0.3, y = bounds[1], xend = k+0.3, yend = bounds[1]), color='black', alpha=1) +
+  geom_segment(aes(x = k-0.3, y = bounds[2], xend = k+0.3, yend = bounds[2]), color='black', alpha=1) +
+  theme_bw()
+print(g)
+ggsave(paste0('./figures_paper/scree_plot_elbow_case2_true.png'), width = 2, height = 2, unit = "in")
+
+# lower
+g <- ggplot(
+  data=data.frame(Index=seq(1,10)[-k], Eigenvalue=vals[-k]),
+  aes(x=Index, y=Eigenvalue)) +
+  theme(text=element_text(size=10)) +
+  scale_x_continuous(breaks= pretty_breaks()) +
+  annotate('rect', xmin=-Inf, xmax=Inf, ymin=vals[k-1], ymax=Inf, alpha=.2, fill='yellow') +
+  annotate('rect', xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=vals[k+1], alpha=.2, fill='yellow') +
+  geom_point() +
+  geom_point(aes(x = k, y = t2), color='red', size=2) +
+  geom_segment(aes(x = r2, y = temp_vals2[r2], xend = r2-1, yend = temp_vals2[r2-1]), color='red', linetype='dashed') +
+  geom_segment(aes(x = r2, y = temp_vals2[r2], xend = r2+1, yend = temp_vals2[r2+1]), color='red', linetype='dashed') +
+  geom_segment(aes(x = k, y = bounds[1], xend = k, yend = bounds[2]), color='black', alpha=1) +
+  geom_segment(aes(x = k-0.3, y = bounds[1], xend = k+0.3, yend = bounds[1]), color='black', alpha=1) +
+  geom_segment(aes(x = k-0.3, y = bounds[2], xend = k+0.3, yend = bounds[2]), color='black', alpha=1) +
+  theme_bw()
+print(g)
+ggsave(paste0('./figures_paper/scree_plot_elbow_case2_lower.png'), width = 2, height = 2, unit = "in")
+
+# upper
+g <- ggplot(
+  data=data.frame(Index=seq(1,10)[-k], Eigenvalue=vals[-k]),
+  aes(x=Index, y=Eigenvalue)) +
+  theme(text=element_text(size=10)) +
+  scale_x_continuous(breaks= pretty_breaks()) +
+  annotate('rect', xmin=-Inf, xmax=Inf, ymin=vals[k-1], ymax=Inf, alpha=.2, fill='yellow') +
+  annotate('rect', xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=vals[k+1], alpha=.2, fill='yellow') +
+  geom_point() +
+  geom_point(aes(x = k, y = t3), color='red', size=2) +
+  geom_segment(aes(x = r3, y = temp_vals3[r3], xend = r3-1, yend = temp_vals3[r3-1]), color='red', linetype='dashed') +
+  geom_segment(aes(x = r3, y = temp_vals3[r3], xend = r3+1, yend = temp_vals3[r3+1]), color='red', linetype='dashed') +
+  geom_segment(aes(x = k, y = bounds[1], xend = k, yend = bounds[2]), color='black', alpha=1) +
+  geom_segment(aes(x = k-0.3, y = bounds[1], xend = k+0.3, yend = bounds[1]), color='black', alpha=1) +
+  geom_segment(aes(x = k-0.3, y = bounds[2], xend = k+0.3, yend = bounds[2]), color='black', alpha=1) +
+  theme_bw()
+print(g)
+ggsave(paste0('./figures_paper/scree_plot_elbow_case2_upper.png'), width = 2, height = 2, unit = "in")
+
+#
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 	Hypothesis tests
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#
+
+load("./data/paper/elbow-power_vs_sigma_multi_test.RData")
+
+alpha <- 0.05
+summary <- results_df %>% drop_na() %>%
+  mutate(
+    detected_r = as.integer(selection_r == rank),
+    fuzzy_detected_r = as.integer(selection_r <= rank),
+    precision = 1/sigma,
+    # method = case_when(
+    #   method == "Selective inference" ~ "SI",
+    #   method == "Selective inference (exact)" ~ "SI (exact)",
+    #   method == "Choi (Bonferroni)" ~ "Choi_Bonferroni",
+    #   method == "Choi" ~ "Choi (Bf.)",
+    #   )
+    method = case_when(
+      method == "Selective inference" ~ "Selective Inference",
+      method == "Selective inference (exact)" ~ "SI (exact)",
+      method == "Choi (Bonferroni)" ~ "Choi et al. (2017) [Bf]",
+      method == "Choi" ~ "Choi et al. (2017)",
+    ),
+    method = replace(method, method == "Choi et al. (2017)", "Choi et al. (2017) [Bf]")
+  ) %>%
+  mutate(rejected = as.integer(pvalue <= ifelse( method == 'Choi et al. (2017) [Bf]', alpha / (p-2), alpha ))) # %>%
+
+
+######### plot detection probability
+g <- ggplot(
+  summary %>% group_by(precision) %>% summarise(detection_probability = mean(detected_r)),
+  aes(x=precision, y=detection_probability)) +
+  geom_line(linetype = 'dashed') +
+  geom_point(size=1) +
+  xlab('1 / Variance') +
+  ylab('Detection probability') +
+  scale_x_log10() +
+  theme(text=element_text(size=10)) +
+  theme_bw()
+plot(g)
+ggsave(paste0('figures_paper/elbow-detection_probability_vs_sigma.png'), width = 2.5, height = 2.8, unit = "in")
+
+######### 1 plot, power per tested
+linetype_map <- c("Selective Inference" = "solid", "Choi et al. (2017) [Bf]" = "dashed")
+g <- ggplot(
+  summary %>%
+    subset(selection_r == 5) %>%
+    subset(tested_k <= rank) %>%
+    subset(method %in% c('Choi et al. (2017) [Bf]', 'Selective Inference')) %>%
+    group_by(precision, method, tested_k) %>%
+    summarise(power = mean(rejected)),
+  aes(x=precision, y=power, linetype=method, shape=as.factor(tested_k), col=as.factor(tested_k))) +
+  geom_line(size=0.5) + #, linetype = 'dashed')+
+  geom_point(size=2) +
+  xlab('1 / Variance') +
+  ylab('Conditional power') +
+  labs(linetype='Method', col='Tested', shape='Tested') +
+  # scale_color_brewer(palette="Reds") +
+  # scale_color_brewer(palette="RdYlBu") +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_fill_viridis(discrete = TRUE) +
+  # geom_hline(yintercept=0.05, linetype="dashed",color = "gray", size=0.5) +
+  scale_x_log10() +
+  scale_linetype_manual(values = linetype_map) +
+  theme_bw()
+plot(g)
+ggsave(paste0('figures_paper/elbow-conditional_power_vs_sigma.pdf'), width = 4, height = 2.8, unit = "in")
+
+color_map <- c("5" = "#fde725", "4" = "#5ec962", "3" = "#21918c", "2"="#3b528b", "1"="#440154")
+# shape_map <- c("1" = 1, '2' = 2, '3' = 0, '4' = 3, '5' = 7)
+for (i in seq(1, 5)) {
+  g <- ggplot(
+    summary %>%
+      subset(selection_r == 5) %>%
+      subset(tested_k <= i) %>%
+      subset(method %in% c('Choi et al. (2017) [Bf]', 'Selective Inference')) %>%
+      group_by(precision, method, tested_k) %>%
+      summarise(power = mean(rejected)),
+    aes(x=precision, y=power, linetype=method, col=as.factor(tested_k))) +
+    geom_line(size=0.5) + #, linetype = 'dashed')+
+    geom_point(size=2) +
+    xlab('1 / Variance') +
+    ylab('Conditional power') +
+    # scale_color_brewer(palette="Reds") +
+    # scale_color_brewer(palette="RdYlBu") +
+    # scale_color_viridis(discrete = TRUE, option = "D") +
+    # scale_fill_viridis(discrete = TRUE) +
+    # geom_hline(yintercept=0.05, linetype="dashed",color = "gray", size=0.5) +
+    scale_x_log10() +
+    scale_linetype_manual("", values = linetype_map) +
+    scale_color_manual("", values = color_map) +
+    labs(linetype='Method', col='Tested') +
+    theme_bw()
+  ggsave(paste0('figures_presentation/elbow-conditional_power_vs_sigma_', i, '.png'), width = 4, height = 2.8, unit = "in")
+}
+
+
+
+
+######### Stratified plots, power by selected
+linetype_map <- c("Choi (Bf.)" = "dashed", "SI" = "solid")
+g <- ggplot(
+  summary %>%
+    subset(tested_k <= rank) %>%
+    subset(method %in% c('Choi (Bf.)', 'SI', 'Selective inference')) %>%
+    group_by(precision, method, tested_k, selection_r) %>%
+    summarise(power = mean(rejected)),
+  aes(x=precision, y=power, linetype=method, shape=as.factor(tested_k), col=as.factor(tested_k))) +
+  geom_line(size=0.5) + #, linetype = 'dashed')+
+  geom_point(size=2) +
+  xlab('1 / Variance') +
+  ylab('Conditional power') +
+  labs(linetype='Method', col='Tested', shape='Tested') +
+  # scale_color_brewer(palette="Reds") +
+  # scale_color_brewer(palette="RdYlBu") +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_fill_viridis(discrete = TRUE) +
+  # geom_hline(yintercept=0.05, linetype="dashed",color = "gray", size=0.5) +
+  scale_x_log10() +
+  scale_linetype_manual(values = linetype_map) +
+  theme_bw() +
+  facet_wrap( ~ selection_r) +
+  theme(text=element_text(size=10))
+plot(g)
+ggsave(paste0('figures_paper/elbow-conditional_power_vs_sigma_strat=selection.png'), width = 6.5, height = 4, unit = "in")
+
+######## old vs new selection
+g <- ggplot(
+  summary %>%
+    # subset(method %in% c('Selective inference (exact)', 'Selective inference', 'SI', 'SI (exact)')) %>%
+    subset(tested_k <= rank) %>%
+    subset(method %in% c('SI', 'SI (exact)')) %>%
+    group_by(precision, method, tested_k) %>%
+    summarise(power = mean(rejected)),
+  aes(x=precision, y=power, linetype=method, shape=as.factor(tested_k), col=as.factor(tested_k))) +
+  geom_line(size=0.5) + #, linetype = 'dashed')+
+  geom_point(size=2) +
+  xlab('1 / Variance') +
+  ylab('Conditional power') +
+  # scale_color_brewer(palette="Reds") +
+  # scale_color_brewer(palette="RdYlBu") +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_fill_viridis(discrete = TRUE) +
+  # geom_hline(yintercept=0.05, linetype="dashed",color = "gray", size=0.5) +
+  labs(linetype='Method', col='Tested', shape='Tested') +
+  scale_x_log10() +
+  theme_bw() +
+  guides(linetype = guide_legend(order = 1))
+plot(g)
+ggsave(paste0('figures_paper/elbow-conditional_power_vs_sigma_exact.png'), width = 4, height = 3, unit = "in")
+
+
+#
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 	Confidence intervals
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#
+
+######## Results under noise
+
+load("./data/paper/elbow-ci_null_validity_multi_test.RData")
+
+plot_df <- results_df %>%
+  drop_na() %>%
+  # subset(method == 'Choi') %>%
+  # subset(tested_k == selection_r) %>%
+  mutate(
+    precision = 1/sigma,
+    covered = as.numeric((ci_lower <= true_pivot) & (true_pivot <= ci_upper)),
+    ci_width = ci_upper - ci_lower,
+    method = case_when(
+      method == "Selective inference" ~ "Selective Inference",
+      method == "Selective inference (exact)" ~ "SI (exact)",
+      method == "Choi (Bf.)" ~ "Choi et al. (2017) [Bf]",
+      method == "Choi" ~ "Choi et al. (2017)",
+    ),
+  ) %>%
+  group_by(
+    method, tested_k
+  ) %>%
+  summarise(
+    median_ci_lower = median(ci_lower),
+    mean_true_pivot = mean(true_pivot),
+    median_ci_upper = median(ci_upper),
+    coverage = mean(covered),
+    median_width = median(ci_width),
+    se = sqrt(coverage * (1 - coverage) / n())
+  )
+
+color_map <- c("Choi et al. (2017)" = hue_pal()(3)[1], "Choi et al. (2017) [Bf]" = hue_pal()(3)[2], "Selective Inference" = hue_pal()(3)[3])
+shape_map <- c("Choi et al. (2017)" = 16, "Choi et al. (2017) [Bf]" = 17, "Selective Inference" = 15)
+
+g <- ggplot(
+  plot_df %>% subset(!method %in% c('SI (exact)')),
+  aes(x=tested_k, y=coverage, shape=method, col=method)) +
+  geom_line(size=0.5) + #, linetype = 'dashed')+
+  geom_point(size=2) +
+  geom_errorbar(aes(ymin=coverage-1.96*se, ymax=coverage+1.96*se), width=.1) +
+  xlab('Tested index') +
+  ylab('Coverage') +
+  labs(col='Method', shape='Method') +
+  # scale_color_brewer(palette="Reds") +
+  # scale_color_brewer(palette="RdYlBu") +
+  # scale_color_viridis(discrete = TRUE, option = "D") +
+  # scale_fill_viridis(discrete = TRUE) +
+  geom_hline(yintercept=0.9, linetype="dashed",color = "gray", size=0.5) +
+  # scale_x_log10() +
+  theme_bw() +
+  scale_colour_manual(values=color_map) +
+  scale_shape_manual(values=shape_map)
+plot(g)
+ggsave(paste0('figures_paper/elbow-ci_null_validity.png'), width = 5, height = 1.5, unit = "in")
+
+plot_df <- results_df %>%
+  drop_na() %>%
+  # subset(method == 'Choi') %>%
+  # subset(tested_k == selection_r) %>%
+  mutate(
+    precision = 1/sigma,
+    covered = as.numeric((ci_lower <= true_pivot) & (true_pivot <= ci_upper)),
+    ci_width = ci_upper - ci_lower,
+    method = case_when(
+      method == "Selective inference" ~ "Selective Inference",
+      method == "Selective inference (exact)" ~ "SI (exact)",
+      method == "Choi (Bf.)" ~ "Choi et al. (2017) [Bf]",
+      method == "Choi" ~ "Choi et al. (2017)",
+    ),
+  ) %>%
+  group_by(
+    method, tested_k, selection_r
+  ) %>%
+  summarise(
+    median_ci_lower = median(ci_lower),
+    mean_true_pivot = mean(true_pivot),
+    median_ci_upper = median(ci_upper),
+    coverage = mean(covered),
+    median_width = median(ci_width),
+    se = sqrt(coverage * (1 - coverage) / n()),
+    sample_size = n()
+  )
+
+g <- ggplot(
+  plot_df %>%
+    subset(method %in% c('Choi et al. (2017) [Bf]', 'Selective Inference')) %>%
+    subset(selection_r <= 8),
+  aes(x=tested_k, y=coverage, color=method, shape=method)) +
+  geom_line(size=0.5) + #, linetype = 'dashed')+
+  geom_point(size=2) +
+  geom_errorbar(aes(ymin=coverage-1.96*se, ymax=coverage+1.96*se), width=.1) +
+  xlab('Tested index') +
+  ylab('Coverage') +
+  labs(col='Method', shape='Method') +
+  # scale_color_brewer(palette="Reds") +
+  # scale_color_brewer(palette="RdYlBu") +
+  # scale_color_viridis(discrete = TRUE, option = "D") +
+  # scale_fill_viridis(discrete = TRUE) +
+  geom_hline(yintercept=0.9, linetype="dashed",color = "gray", size=0.5) +
+  # scale_x_log10() +
+  theme_bw() +
+  scale_colour_manual(values=color_map) +x
+  scale_shape_manual(values=shape_map) +
+  facet_wrap(~ selection_r, nrow=2)
+plot(g)
+ggsave(paste0('figures_paper/elbow-ci_null_validity_strat=selection.png'), width = 6.5, height = 3, unit = "in")
+
+######## Results under signal
+
+load("./data/paper/elbow-ci_vs_sigma_multi_test.RData")
+
+plot_df <- results_df %>%
+  drop_na() %>%
+  # subset(selection_r == rank) %>%
+  mutate(
+    precision = 1/sigma,
+    covered = as.numeric((ci_lower <= true_pivot) & (true_pivot <= ci_upper)),
+    ci_width = ci_upper - ci_lower,
+    method = case_when(
+      method == "Selective inference" ~ "SI",
+      method == "Selective inference (restricted)" ~ "SI (exact)",
+      method == "Choi (Bf.)" ~ "Choi (Bf.)",
+      method == "Choi" ~ "Choi",
+    )
+  ) %>%
+  group_by(
+    method, precision
+  ) %>%
+  summarise(
+    median_ci_lower = median(ci_lower),
+    median_true_pivot = median(true_pivot),
+    median_ci_upper = median(ci_upper),
+    coverage = mean(covered),
+    median_width = median(ci_width),
+    se = sqrt(coverage * (1 - coverage) / n()),
+    sample_size = n()
+  )
+
+# plot coverage results
+g <- ggplot(
+  plot_df %>% subset(method %in% c('SI', 'Choi (Bf.)')),
+  aes(x=precision, y=coverage, color=method, shape=method)) +
+  # geom_line(size=0.5) +
+  geom_point(size=2) +
+  geom_errorbar(aes(ymin=coverage-1.96*se, ymax=coverage+1.96*se), width=.1) +
+  xlab('1 / Variance') +
+  ylab('Coverage') +
+  labs(color='') +
+  geom_hline(yintercept=0.9, linetype="dashed", color = "gray", size=0.5) +
+  theme_bw() +
+  scale_x_log10() +
+  theme(
+    legend.position="none") +
+  scale_color_manual(values = color_map) +
+  scale_shape_manual(values = scale_map)
+plot(g)
+ggsave(paste0('figures_paper/elbow-ci_coverage.png'), width = 1.75, height = 1.5, unit = "in")
+
+linetype_map <- c("Choi (Bf.)" = "dashed", "SI" = "solid") # need to uncomment items, and group_by tested k too
+g <- ggplot(
+  plot_df %>% subset(method %in% c('SI', 'Choi (Bf.)')),
+  # aes(x=precision, y=median_width, color=as.factor(tested_k), shape=as.factor(tested_k), linetype=method)) +
+  aes(x=precision, y=median_width, color=method, shape=method)) +
+  geom_line(size=0.5)+
+  geom_point(size=2) +
+  xlab('1 / Variance') +
+  ylab('Median width') +
+  labs(color='') +
+  # labs(color='Tested', shape='Tested', linetype='Method') +
+  theme_bw() +
+  scale_x_log10() +
+  theme(legend.position="none") +
+  # scale_color_viridis(discrete = TRUE, option = "D") +
+  # scale_fill_viridis(discrete = TRUE) +
+  # scale_linetype_manual(values = linetype_map)
+  scale_color_manual(values = color_map) +
+  scale_shape_manual(values = scale_map)
+plot(g)
+ggsave(paste0('figures_paper/elbow-ci_width.png'), width = 1.75, height = 1.5, unit = "in")
+# ggsave(paste0('figures_paper/elbow-ci_width_multitest.png'), width = 4, height = 3, unit = "in")
+
+g <- ggplot(
+  plot_df %>% subset(method %in% c('SI', 'Choi (Bf.)', 'Choi')),
+  aes(x=precision, shape=method, color=method)) +
+  geom_line(aes(y=median_ci_lower)) +
+  geom_point(aes(y=median_ci_lower)) +
+  geom_line(aes(y=median_ci_upper)) +
+  geom_point(aes(y=median_ci_upper)) +
+  geom_line(aes(y = median_true_pivot), color='black', linetype="dotted", size=0.5) +
+  xlab('1 / Variance') +
+  ylab('Median bounds') +
+  labs(color='Method', shape='Method', size='') +
+  theme_bw() +
+  scale_x_log10() +
+  guides(size = 'none')
+  
+plot(g)
+ggsave(paste0('figures_paper/elbow-ci_bounds.png'), width = 3, height = 1.5, unit = "in")
+
+
+######## Results under signal, stratified
+
+load("./data/paper/elbow-ci_vs_sigma_multi_test.RData")
+
+plot_df <- results_df %>%
+  drop_na() %>%
+  subset(tested_k <= rank) %>%
+  mutate(
+    precision = 1/sigma,
+    covered = as.numeric((ci_lower <= true_pivot) & (true_pivot <= ci_upper)),
+    ci_width = ci_upper - ci_lower,
+    method = case_when(
+      method == "Selective inference" ~ "SI",
+      method == "Selective inference (restricted)" ~ "SI (exact)",
+      method == "Choi (Bf.)" ~ "Choi (Bf.)",
+      method == "Choi" ~ "Choi",
+    )
+  ) %>%
+  group_by(
+    method, precision, selection_r, tested_k
+  ) %>%
+  summarise(
+    median_ci_lower = median(ci_lower),
+    median_true_pivot = median(true_pivot),
+    median_ci_upper = median(ci_upper),
+    coverage = mean(covered),
+    median_width = median(ci_width),
+  )
+
+linetype_map <- c("Choi (Bf.)" = "dashed", "SI" = "solid")
+g <- ggplot(
+  plot_df %>%
+    subset(method %in% c('Choi (Bf.)', 'SI', 'Selective inference')),
+  aes(x=precision, y=median_width, linetype=method, shape=as.factor(tested_k), col=as.factor(tested_k))) +
+  geom_line(size=0.5) + #, linetype = 'dashed')+
+  geom_point(size=2) +
+  xlab('1 / Variance') +
+  ylab('Median width') +
+  labs(linetype='Method', col='Tested', shape='Tested') +
+  # scale_color_brewer(palette="Reds") +
+  # scale_color_brewer(palette="RdYlBu") +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_fill_viridis(discrete = TRUE) +
+  # geom_hline(yintercept=0.05, linetype="dashed",color = "gray", size=0.5) +
+  scale_x_log10() +
+  scale_linetype_manual(values = linetype_map) +
+  theme_bw() +
+  facet_wrap( ~ selection_r)
+plot(g)
+ggsave(paste0('figures_paper/elbow-ci_width_strat=selection.png'), width = 6.5, height = 4, unit = "in")
