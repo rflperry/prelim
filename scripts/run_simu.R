@@ -14,15 +14,18 @@ sigma = as.numeric(args[6])
 NREP = as.numeric(args[7])
 
 
-alg = "S"
-learner = "lasso"
-setup = "B"
-n = 500
-p = 6
-sigma =0.5
-NREP = 1
+# alg = "S"
+# learner = "lasso"
+# setup = "B"
+# n = 20 # 500
+# p = 6 # 6
+# sigma =0.5
+# NREP = 1
+# n_folds = 3
 
 n_trees = 100
+kern_b_range = 10^c(-3, -1, 1, 3)
+kern_lambda_range = 10^c(-3, -1, 1, 3)
 
 if (setup == 'A') {
   get.params = function() {
@@ -102,33 +105,33 @@ results_list = lapply(1:NREP, function(iter) {
     if (learner == "lasso") {
       if (alg == 'R') {
 
-        fit <- rlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", rs = FALSE)
+        fit <- rlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", rs = FALSE, k_folds = n_folds)
 
       } else if (alg == 'RS') {
 
-        fit <- rlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", rs = TRUE)
+        fit <- rlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", rs = TRUE, k_folds = n_folds)
 
       } else if (alg == 'oracle') {
 
         p_hat_oracle = params_train$e
         m_hat_oracle = params_train$b + (params_train$e-0.5) * params_train$tau
-        fit <- rlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", rs = FALSE, p_hat = p_hat_oracle, m_hat = m_hat_oracle)
+        fit <- rlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", rs = FALSE, p_hat = p_hat_oracle, m_hat = m_hat_oracle, k_folds = n_folds)
 
       } else if (alg == 'S') {
 
-        fit <- slasso(X_train, W_train, Y_train, lambda_choice = "lambda.min")#, penalty_search=FALSE)
+        fit <- slasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", k_folds = n_folds)#, penalty_search=FALSE)
 
       } else if (alg == 'T') {
 
-        fit <- tlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min")
+        fit <- tlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", k_folds = n_folds)
 
       } else if (alg == 'X') {
 
-        fit <- xlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min")
+        fit <- xlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", k_folds = n_folds)
 
       } else if (alg == 'U') {
 
-        fit <- ulasso(X_train, W_train, Y_train, lambda_choice = "lambda.1se", cutoff = 0.05)
+        fit <- ulasso(X_train, W_train, Y_train, lambda_choice = "lambda.1se", cutoff = 0.05, k_folds = n_folds)
 
       } else {
 
@@ -139,40 +142,40 @@ results_list = lapply(1:NREP, function(iter) {
     } else if (learner == "boost") {
       if (alg == 'R') {
 
-        fit <- rboost(X_train, W_train, Y_train, nthread=1, verbose=TRUE)
+        fit <- rboost(X_train, W_train, Y_train, nthread=1, verbose=TRUE, k_folds = n_folds)
 
       } else if (alg == 'oracle') {
 
         p_hat_oracle = params_train$e
         m_hat_oracle = params_train$b + (params_train$e-0.5) * params_train$tau
-        fit <- rboost(X_train, W_train, Y_train, p_hat = p_hat_oracle, m_hat = m_hat_oracle, nthread = 1, verbose=TRUE)
+        fit <- rboost(X_train, W_train, Y_train, p_hat = p_hat_oracle, m_hat = m_hat_oracle, nthread = 1, verbose=TRUE, k_folds = n_folds)
 
       } else if (alg == 'S') {
 
-        fit <- sboost(X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees)
+        fit <- sboost(X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
 
       } else if (alg == 'T') {
 
-        fit <- tboost(X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees)
+        fit <- tboost(X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
 
       } else if (alg == 'X') {
 
-        fit <- xboost(X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees)
+        fit <- xboost(X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
 
       } else if (alg == 'U') {
 
-        fit <- uboost(X_train, W_train, Y_train, cutoff = 0.05, nthread = 1, verbose = TRUE, ntrees_max = n_trees)
+        fit <- uboost(X_train, W_train, Y_train, cutoff = 0.05, nthread = 1, verbose = TRUE, ntrees_max = n_tree, k_folds = n_foldss)
 
       } else if (alg == 'causalboost') {
         causallearning_available = requireNamespace("causalLearning", quietly = TRUE)
         if (!causallearning_available) {
           stop("causalLearning needs to be installed for causal boosting.")
         }
-        w_fit = cvboost(X_train, W_train, objective = "binary:logistic", nthread = 1, verbose = TRUE, ntrees_max = n_trees)
+        w_fit = cvboost(X_train, W_train, objective = "binary:logistic", nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
         p_hat = predict(w_fit)
 
         stratum = stratify(p_hat, W_train)$stratum
-        fit = causalLearning::cv.causalBoosting(X_train, as.numeric(W_train), Y_train, propensity = T, stratum = stratum)
+        fit = causalLearning::cv.causalBoosting(X_train, as.numeric(W_train), Y_train, propensity = T, stratum = stratum, num.trees = n_trees, nfolds = n_folds)
 
       } else {
 
@@ -193,9 +196,9 @@ results_list = lapply(1:NREP, function(iter) {
       if (alg == 'R') {
 
         fit = rkern(X_train, W_train, Y_train,
-                         k_folds = 5,
-                         b_range = 10^(seq(-3,3,0.5)),
-                         lambda_range = 10^(seq(-3,3,0.5)))
+                         k_folds = n_folds,
+                         b_range = kern_b_range,
+                         lambda_range = kern_lambda_range)
 
       } else if (alg == 'oracle') {
 
@@ -205,39 +208,37 @@ results_list = lapply(1:NREP, function(iter) {
         fit = rkern(X_train, W_train, Y_train,
                     p_hat = p_hat_oracle,
                     m_hat = m_hat_oracle,
-                    k_folds = 5,
-                    b_range = 10^(seq(-3,3,0.5)),
-                    lambda_range = 10^(seq(-3,3,0.5)))
+                    k_folds = n_folds,
+                    b_range = kern_b_range,
+                    lambda_range = kern_lambda_range)
 
       } else if (alg == 'S') {
 
         fit <- skern(X_train, W_train, Y_train,
-                     k_folds = 5,
-                     b_range = 10^(seq(-3,3,0.5)),
-                     lambda_range = 10^(seq(-3,3,0.5)))
+                     k_folds = n_folds,
+                     b_range = kern_b_range,
+                     lambda_range = kern_lambda_range)
       } else if (alg == 'T') {
 
         fit <- tkern(X_train, W_train, Y_train,
-                     k_folds = 5,
-                     b_range = 10^(seq(-3,3,0.5)),
-                     lambda_range = 10^(seq(-3,3,0.5)))
+                     k_folds = n_folds,
+                     b_range = kern_b_range,
+                     lambda_range = kern_lambda_range)
 
       } else if (alg == 'X') {
 
         fit <- xkern(X_train, W_train, Y_train,
-                    k_folds=NULL,
+                    k_folds=n_folds,
                     b_range =10^(seq(-3,3,0.5)),
-                    lambda_range = 10^(seq(-3,3,0.5)))
+                    lambda_range = kern_lambda_range)
 
-      }
-      else if (alg == 'U') {
+      } else if (alg == 'U') {
 
         fit <- ukern(X_train, W_train, Y_train,
-                     k_folds = 5,
-                     b_range = 10^(seq(-3,3,0.5)),
-                     lambda_range = 10^(seq(-3,3,0.5)))
-      }
-      else {
+                     k_folds = n_folds,
+                     b_range = kern_b_range,
+                     lambda_range = kern_lambda_range)
+      } else {
 
         stop("bad alg input")
 
