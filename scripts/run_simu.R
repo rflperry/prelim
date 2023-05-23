@@ -1,8 +1,10 @@
 rm(list = ls())
 
 library(rlearner)
-
-start_time <- Sys.time()
+# one loop. all params
+# - lasso: 24 sec
+# - boost: 25 sec
+# - kernel: 113 sec
 
 args=(commandArgs(TRUE))
 alg = as.character(args[1])
@@ -13,16 +15,15 @@ p = as.numeric(args[5])
 sigma = as.numeric(args[6])
 NREP = as.numeric(args[7])
 
-
-# alg = "S"
-# learner = "lasso"
-# setup = "B"
-# n = 20 # 500
-# p = 6 # 6
-# sigma =0.5
+# alg = "causalboost"
+# learner = "boost"
+# setup = "A"
+# n = 100
+# p = 6
+# sigma = 0.5
 # NREP = 1
-# n_folds = 3
 
+n_folds = 3
 n_trees = 100
 kern_b_range = 10^c(-3, -1, 1, 3)
 kern_lambda_range = 10^c(-3, -1, 1, 3)
@@ -73,6 +74,7 @@ if (setup == 'A') {
 
 }
 
+start_time <- Sys.time()
 make_matrix = function(x) stats::model.matrix(~.-1, x)
 results_list = lapply(1:NREP, function(iter) {
     print(paste0("starting iteration ", iter))
@@ -123,11 +125,17 @@ results_list = lapply(1:NREP, function(iter) {
 
       } else if (alg == 'T') {
 
-        fit <- tlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", k_folds = n_folds)
+        fit <- tlasso(
+            X_train, W_train, Y_train, lambda_choice = "lambda.min",
+            k_folds_mu1 = n_folds, k_folds_mu0 = n_folds
+          )
 
       } else if (alg == 'X') {
 
-        fit <- xlasso(X_train, W_train, Y_train, lambda_choice = "lambda.min", k_folds = n_folds)
+        fit <- xlasso(
+          X_train, W_train, Y_train, lambda_choice = "lambda.min",
+          k_folds_mu1 = n_folds, k_folds_mu0 = n_folds, k_folds_p = n_folds
+        )
 
       } else if (alg == 'U') {
 
@@ -156,26 +164,32 @@ results_list = lapply(1:NREP, function(iter) {
 
       } else if (alg == 'T') {
 
-        fit <- tboost(X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
+        fit <- tboost(
+            X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees,
+            k_folds_mu1 = n_folds, k_folds_mu0 = n_folds
+          )
 
       } else if (alg == 'X') {
 
-        fit <- xboost(X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
+        fit <- xboost(
+            X_train, W_train, Y_train, nthread = 1, verbose = TRUE, ntrees_max = n_trees,
+            k_folds_mu1 = n_folds, k_folds_mu0 = n_folds, k_folds_p = n_folds
+          )
 
       } else if (alg == 'U') {
 
-        fit <- uboost(X_train, W_train, Y_train, cutoff = 0.05, nthread = 1, verbose = TRUE, ntrees_max = n_tree, k_folds = n_foldss)
+        fit <- uboost(X_train, W_train, Y_train, cutoff = 0.05, nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
 
       } else if (alg == 'causalboost') {
         causallearning_available = requireNamespace("causalLearning", quietly = TRUE)
         if (!causallearning_available) {
           stop("causalLearning needs to be installed for causal boosting.")
         }
-        w_fit = cvboost(X_train, W_train, objective = "binary:logistic", nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
-        p_hat = predict(w_fit)
+        # w_fit = cvboost(X_train, W_train, objective = "binary:logistic", nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
+        # p_hat = predict(w_fit)
 
-        stratum = stratify(p_hat, W_train)$stratum
-        fit = causalLearning::cv.causalBoosting(X_train, as.numeric(W_train), Y_train, propensity = T, stratum = stratum, num.trees = n_trees, nfolds = n_folds)
+        # stratum = causalLearning::stratify(p_hat, W_train)$stratum
+        fit = causalLearning::cv.causalBoosting(X_train, as.numeric(W_train), Y_train, num.trees = n_trees, nfolds = n_folds) # propensity = T, stratum = stratum)#
 
       } else {
 
@@ -280,5 +294,5 @@ end_time <- Sys.time()
 time_taken <- end_time - start_time
 print(time_taken)
 
-fnm = paste("results/output", alg, learner, setup, n, p, sigma, NREP, "full.csv", sep="-")
-write.csv(results, file=fnm)
+# fnm = paste("sim_results/output", alg, learner, setup, n, p, sigma, NREP, "full.csv", sep="-")
+# write.csv(results, file=fnm)

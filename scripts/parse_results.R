@@ -2,33 +2,37 @@ rm(list = ls())
 
 library(xtable)
 library(data.table)
-#learner = "lasso" # uncomment for lasso results
-#learner = "boost" # uncomment for boost results
+# learner = "lasso" # uncomment for lasso results
+learner = "boost" # uncomment for boost results
 #learner = "kernel" # uncomment for kernel results
 
 if (learner != "boost" & learner != "lasso" & learner != "kernel") {
   stop("learner needs to be boost or lasso or kernel")
 }
 
-filenames = list.files("resultslasso", pattern="*", full.names=TRUE)
+filenames = list.files("sim_results/", pattern=paste0("*", learner, "*"), full.names=TRUE)
 
-param.names = c("alg", "learner", "setup", "n", "p", "sigma")
+param.names = c("alg", "learner", "setup", "n", "p", "sigma", "n_reps")
 setup.values = c('A', 'B', 'C', 'D')
 
 raw = data.frame(t(sapply(filenames, function(fnm) {
   output = read.csv(fnm)[,-1]
-  params = strsplit(fnm, "-")[[1]][2:7]
+  params = strsplit(fnm, "-")[[1]][2:8]
 
   mse.mean = mean(output)
+  mse.sd = sd(output)
 
   c(params,
-    mse=sprintf("%.8f", round(mse.mean, 8)))
+    mse=sprintf("%.8f", round(mse.mean, 8)),
+    sd=sprintf("%.8f", round(mse.sd, 8)))
 })))
 
 
 rownames(raw) = 1:nrow(raw)
 names(raw) = c(param.names,
-               "mean")
+               "mean", "sd")
+
+n_reps <- raw$n_reps[1]
 
 raw<-raw[raw$learner==learner & (raw$setup %in% setup.values), ] # only look at boost or lasso results
 
@@ -75,7 +79,7 @@ raw = data.frame(apply(raw, 1:2, as.character))
 raw.round = data.frame(apply(raw.round, 1:2, as.character))
 
 # write raw csv output file
-write.csv(raw, file=paste0("output_", learner, ".csv"))
+write.csv(raw, file=paste0("output_", learner, ".csv"), row.names=FALSE)
 
 # get a dataframe for each setup
 raw.by.setup = lapply(c(setup.values), function(x) raw.round[raw.round$setup==x, ])
@@ -99,11 +103,11 @@ for (i in seq_along(setup.values)){
   print(setup.values[i])
   print(tab.setup)
   if (learner == "boost") {
-    xtab.setup = xtable(tab.setup, caption = paste0("\\tt Mean-squared error running \\texttt{boosting} from Setup ", setup.values[i], ". Results are averaged across 200 runs, rounded to two decimal places, and reported on an independent test set of size $n$."), align="ccccccccccc", label=paste0("table:setup",i))
+    xtab.setup = xtable(tab.setup, caption = paste0("\\tt Mean-squared error running \\texttt{boosting} from Setup ", setup.values[i], ". Results are averaged across ", n_reps, " runs, rounded to two decimal places, and reported on an independent test set of size $n$."), align="ccccccccccc", label=paste0("table:setup",i))
   } else if  (learner == "lasso"){
-    xtab.setup = xtable(tab.setup, caption = paste0("\\tt Mean-squared error running \\texttt{lasso} from Setup ", setup.values[i], ". Results are averaged across 500 runs, rounded to two decimal places, and reported on an independent test set of size $n$."), align="ccccccccccc", label=paste0("table:setup",i))
+    xtab.setup = xtable(tab.setup, caption = paste0("\\tt Mean-squared error running \\texttt{lasso} from Setup ", setup.values[i], ". Results are averaged across ", n_reps, " runs, rounded to two decimal places, and reported on an independent test set of size $n$."), align="ccccccccccc", label=paste0("table:setup",i))
   } else if  (learner == "kernel"){
-    xtab.setup = xtable(tab.setup, caption = paste0("\\tt Mean-squared error running \\texttt{kernel} from Setup ", setup.values[i], ". Results are averaged across 200 runs, rounded to two decimal places, and reported on an independent test set of size $n$."), align="cccccccccc", label=paste0("table:setup",i))
+    xtab.setup = xtable(tab.setup, caption = paste0("\\tt Mean-squared error running \\texttt{kernel} from Setup ", setup.values[i], ". Results are averaged across ", n_reps, " runs, rounded to two decimal places, and reported on an independent test set of size $n$."), align="cccccccccc", label=paste0("table:setup",i))
   }
   names(xtab.setup) <- c(c('n','d','$\\sigma$'), algs.tex)
   print(xtab.setup, include.rownames = FALSE, include.colnames = TRUE, sanitize.text.function = identity, file = paste("tables", "/simulation_results_setup_", setup.values[i], "_", learner, ".tex", sep=""))
