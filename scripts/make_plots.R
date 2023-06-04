@@ -2,7 +2,7 @@ library(tidyverse)
 library(RColorBrewer)
 
 method =  "lasso" #"boost" #  "lasso" #  
-metric = 'mean'
+metric = 'sd'
 
 load_dir = 'outputs'
 save_dir = 'figures'

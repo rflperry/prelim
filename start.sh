@@ -1,18 +1,23 @@
 #! /bin/bash
-
-setupvals=('A' 'B' 'C' 'D')
-nvals=(500 1000) # (500 1000)
+# TODO B, D
+setupvals=('B' 'D') # 'A' 'B' 'C' 'D')
+nvals=(250 500) # (500 1000)
 pvals=(6) # (6 12)
 sigmavals=(0.5 1.0 3.0) # (0.5 1.0 2.0 4.0)
 lassoalgvals=('R' 'RS' 'T' 'X' 'U' 'oracle' 'S')
 boostalgvals=('R' 'T' 'X' 'U' 'oracle' 'S' 'causalboost')
 kernelalgvals=('R' 'T' 'X' 'U' 'oracle' 'S')
 
-lassoreps=200 # 50 #00 # 00 # 500
-boostreps=200 # 00 # 200 
-kernelreps=200 # 00 # 200
+# TODO:
+# - oracle, S on 0.5 and n=1000
+# - all on 3 and n=1000
+# - all on all sigma, all n, setups B,C,D 
 
-learners=('boost') # 'lasso' 'kernel')
+lassoreps=500 # 50 #00 # 00 # 500
+boostreps=200 # 00 # 200 
+kernelreps=100 # 00 # 200
+
+learners=('lasso') # 'lasso' 'kernel')
 
 for ((i1=0; i1<${#setupvals[@]} ;i1++))
 do
@@ -52,7 +57,7 @@ do
          sleep 5
       done
       alg=${algvals[$i6]}
-      fnm="logging/progress-$alg-$learner-$setup-$n-$p-$sigma-$reps.out"
+      fnm="logging_lasso/progress-$alg-$learner-$setup-$n-$p-$sigma-$reps.out"
 
       OMP_NUM_THREADS=1 Rscript scripts/run_simu.R $alg $learner $setup $n $p $sigma $reps 2>&1 | tee $fnm &
       echo "OMP_NUM_THREADS=1 Rscript scripts/run_simu.R $alg $learner $setup $n $p $sigma $reps 2>&1 | tee $fnm &"
