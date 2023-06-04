@@ -23,10 +23,10 @@ NREP = as.numeric(args[7])
 # sigma = 0.5
 # NREP = 1
 
-n_folds = 3
+n_folds = 10  # cross validation folds for all methods
 n_trees = 100
-kern_b_range = 10^c(-3, -1, 1, 3)
-kern_lambda_range = 10^c(-3, -1, 1, 3)
+kern_b_range = 10^c(-3, -1, 0, 1, 3)
+kern_lambda_range = 10^c(-3, -1, 0, 1, 3)
 
 if (setup == 'A') {
   get.params = function() {
@@ -185,11 +185,11 @@ results_list = lapply(1:NREP, function(iter) {
         if (!causallearning_available) {
           stop("causalLearning needs to be installed for causal boosting.")
         }
-        # w_fit = cvboost(X_train, W_train, objective = "binary:logistic", nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
-        # p_hat = predict(w_fit)
+        w_fit = cvboost(X_train, W_train, objective = "binary:logistic", nthread = 1, verbose = TRUE, ntrees_max = n_trees, k_folds = n_folds)
+        p_hat = predict(w_fit)
 
-        # stratum = causalLearning::stratify(p_hat, W_train)$stratum
-        fit = causalLearning::cv.causalBoosting(X_train, as.numeric(W_train), Y_train, num.trees = n_trees, nfolds = n_folds) # propensity = T, stratum = stratum)#
+        stratum = causalLearning::stratify(p_hat, W_train)$stratum
+        fit = causalLearning::cv.causalBoosting(X_train, as.numeric(W_train), Y_train, num.trees = n_trees, nfolds = n_folds, propensity = T, stratum = stratum)#
 
       } else {
 
@@ -294,5 +294,5 @@ end_time <- Sys.time()
 time_taken <- end_time - start_time
 print(time_taken)
 
-# fnm = paste("sim_results/output", alg, learner, setup, n, p, sigma, NREP, "full.csv", sep="-")
-# write.csv(results, file=fnm)
+fnm = paste("sim_results_lasso/output", alg, learner, setup, n, p, sigma, NREP, "full.csv", sep="-")
+write.csv(results, file=fnm)

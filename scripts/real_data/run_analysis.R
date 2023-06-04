@@ -191,6 +191,11 @@ pardef = par(mar = c(4.5, 5, 3, 2) + 0.5, cex.lab=1.5, cex.axis=1.5, cex.main=1.
 hist(TAU.all[1:n.train], main = "", xlab = "CATE", col = cols[1])
 dev.off()
 
+pdf("figures/fig1_tau_histogram.png")
+pardef = par(mar = c(4.5, 5, 3, 2) + 0.5, cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5)
+hist(TAU.all[1:n.train], main = "", xlab = "CATE", col = cols[1])
+dev.off()
+
 TAU.bucket = as.numeric(cut(TAU.test,
                             breaks = c(quantile(TAU.test[TAU.test < 0], c(0, 0.25, 0.5, 0.75, 1)) - 0.001, 0.001))) - 1
 TAU.mids = sapply(0:4, function(ii) median(TAU.test[TAU.bucket == ii]))
@@ -201,7 +206,20 @@ ATvec = c(ATmat)
 BPDF = data.frame(CATE=c(2 * TAU.bucket, 1 + 2 * TAU.bucket),
                   prediction=c(tau.hat.lasso.test, tau.hat.boost.test))
 
-pdf("figures/fig1_tau_boxplot.pdf")
+pdf("figures/fig1_tau_boxplot.png")
+pardef = par(xpd = FALSE, mar = c(4.5, 5, 3, 8) + 0.5, cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5)
+boxplot(prediction ~ CATE, data = BPDF, col = cols[2:3],
+        at = ATvec,  pars = list(boxwex = 0.007), xlim = range(ATvec),
+        names = rep("", 10), xlab = "CATE", ylab = "Prediction", xaxt = "n")
+axis(1, at = round(TAU.mids, 2))
+abline(0, 1, lwd = 2)
+
+par(xpd = TRUE)
+legend(0.03, 0.1, c("Lasso", "Boost"), fill = cols[2:3], cex = 1.5)
+par = pardef
+dev.off()
+
+pdf("figures/fig1_tau_boxplot.png")
 pardef = par(xpd = FALSE, mar = c(4.5, 5, 3, 8) + 0.5, cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5)
 boxplot(prediction ~ CATE, data = BPDF, col = cols[2:3],
         at = ATvec,  pars = list(boxwex = 0.007), xlim = range(ATvec),

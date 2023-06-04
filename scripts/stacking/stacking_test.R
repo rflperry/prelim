@@ -7,7 +7,7 @@ mufn = function(xx) { 3 / (1 + exp(-xx[2] + xx[3])) }
 
 prob = 0.5
 p = 10
-n = 1000#0
+n = 10000
 
 #sigmas = c(0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4)
 sigmas <- c(0.25, 1, 2, 4)
@@ -69,4 +69,4 @@ all.results <- foreach(sigma = sigmas) %dopar% {
 
 parallel::stopCluster(cl)
 
-save.image("results/stacking_test.RData")
+save.image("stacking_results/stacking_test.RData")

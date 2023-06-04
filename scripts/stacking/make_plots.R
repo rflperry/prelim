@@ -13,21 +13,21 @@ library(tidyr)
 sigmas <- c(0.25, 1, 2, 4)
 in_use = 1:4
 
-load("results/stacking_test.RData")
+load("stacking_results/stacking_test.RData")
 
 results_a = Reduce(rbind, lapply(all.results, rowMeans))
 sd_a = Reduce(rbind, lapply(all.results, function(xx) apply(xx, 1, sd))) / sqrt(NREP)
 
-load("results/stacking_test_B.RData")
+load("stacking_results/stacking_test_B.RData")
 
 results_b = Reduce(rbind, lapply(all.results, rowMeans))
 sd_b = Reduce(rbind, lapply(all.results, function(xx) apply(xx, 1, sd))) / sqrt(NREP)
 
 to_plot_a = data.frame(sigmas[in_use], sqrt(results_a[in_use, 2:4]))
-names(to_plot_a) = c("Sigma", "CF", "BART", "STACK")
+names(to_plot_a) = c("Sigma", "CF", "BART", "Stack")
 
 to_plot_b = data.frame(sigmas[in_use], sqrt(results_b[in_use, 2:4]))
-names(to_plot_b) = c("Sigma", "CF", "BART", "STACK")
+names(to_plot_b) = c("Sigma", "CF", "BART", "Stack")
 
 raw_a = sqrt(mean(results_a[,1]))
 raw_b = sqrt(mean(results_b[,1]))
@@ -36,7 +36,7 @@ rng = range(c(to_plot_a[,2:4], to_plot_b[,2:4], raw_a, raw_b))
 
 g <- ggplot(
   as.data.frame(to_plot_a) %>%
-    pivot_longer(cols=c('CF', 'BART', 'STACK'), values_to='RMSE', names_to='Method'),
+    pivot_longer(cols=c('CF', 'BART', 'Stack'), values_to='RMSE', names_to='Method'),
   aes(x=Sigma, y=RMSE, col=Method)) +
   geom_point() +
   geom_line() +
@@ -46,10 +46,11 @@ g <- ggplot(
   scale_y_log10()
 print(g)
 ggsave(paste0("figures/rstack_discontinuous.pdf"), width = 3, height = 2.5, unit = "in")
+ggsave(paste0("figures/rstack_discontinuous.png"), width = 3, height = 2.5, unit = "in")
 
 g <- ggplot(
   as.data.frame(to_plot_b) %>%
-    pivot_longer(cols=c('CF', 'BART', 'STACK'), values_to='RMSE', names_to='Method'),
+    pivot_longer(cols=c('CF', 'BART', 'Stack'), values_to='RMSE', names_to='Method'),
   aes(x=Sigma, y=RMSE, col=Method)) +
   geom_point() +
   geom_line() +
@@ -59,6 +60,7 @@ g <- ggplot(
   scale_y_log10()
 print(g)
 ggsave(paste0("figures/rstack_smooth.pdf"), width = 3, height = 2.5, unit = "in")
+ggsave(paste0("figures/rstack_smooth.png"), width = 3, height = 2.5, unit = "in")
 
 # cols = brewer.pal(3, "Dark2")
 # 
